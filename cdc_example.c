@@ -6,6 +6,7 @@
  */
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <errno.h>
 
@@ -14,8 +15,8 @@
 /* You may want to change the VENDOR_ID and PRODUCT_ID
  * depending on your device.
  */
-#define VENDOR_ID      0x2341   // Arduino LLC
-#define PRODUCT_ID     0x0034   // Arduino Leonardo
+#define VENDOR_ID      0x03eb //Atmel Corp. Controller
+#define PRODUCT_ID     0x2404 //Canbus
 
 #define ACM_CTRL_DTR   0x01
 #define ACM_CTRL_RTS   0x02
@@ -27,16 +28,16 @@ static struct libusb_device_handle *devh = NULL;
 /* The Endpoint address are hard coded. You should use lsusb -v to find
  * the values corresponding to your device.
  */
-static int ep_in_addr  = 0x83;
+static int ep_in_addr  = 0x81;
 static int ep_out_addr = 0x02;
 
-void write_char(unsigned char c)
+void write_char(unsigned char *c, int length)
 {
     /* To send a char to the device simply initiate a bulk_transfer to the
      * Endpoint with address ep_out_addr.
      */
     int actual_length;
-    if (libusb_bulk_transfer(devh, ep_out_addr, &c, 1,
+    if (libusb_bulk_transfer(devh, ep_out_addr, c, length,
                              &actual_length, 0) < 0) {
         fprintf(stderr, "Error while sending char\n");
     }
@@ -61,9 +62,115 @@ int read_chars(unsigned char * data, int size)
     return actual_length;
 }
 
+static void usage(int argc, char **argv)
+{
+	printf("Usage:\t\n");
+	printf("%s prog command1 command2\n", argv[0]);
+	printf("%s read_sw_version\n", argv[0]);
+	printf("%s request_jump_to_bootloader_app\n", argv[0]);
+	printf("%s request_to_reset_device\n", argv[0]);
+	printf("%s query_device_mode\n", argv[0]);
+	printf("%s enable_CANbus\n", argv[0]);
+	printf("%s disable_CANbus\n", argv[0]);
+	printf("%s enable_loopback_mode\n", argv[0]);
+	printf("%s disable_loopback_mode\n", argv[0]);
+	printf("%s CANbus_status\n", argv[0]);
+	printf("%s CANbus_err_count\n", argv[0]);
+}
+
 int main(int argc, char **argv)
 {
-    int rc;
+	const char *cmd, *cmd1, *cmd2 = NULL;
+    int rc, cmd_size;
+    unsigned char data[64];
+
+	memset(data, 0, sizeof(data));
+	
+	if (argc == 1)
+	{
+		usage(argc, argv);
+		return 0;
+	}
+	else
+		cmd = argv[1];
+
+	if (argc > 0 && strcmp(cmd, "prog") == 0)
+	{
+		cmd1 = argv[2];
+		cmd2 = argv[3];
+		data[0] = (unsigned char)strtoul(cmd1, NULL, 16);
+		data[1] = (unsigned char)strtoul(cmd2, NULL, 16);
+		cmd_size = 2;
+	}
+	else if (argc > 0 && strcmp(cmd, "read_sw_version") == 0)
+	{
+		data[0] = 0xFF;
+		data[1] = 0xC0;
+		cmd_size = 2;
+	}
+	else if (argc > 0 && strcmp(cmd, "request_jump_to_bootloader_app") == 0)
+	{
+		data[0] = 0xFF;
+		data[1] = 0xB0;
+		cmd_size = 2;
+	}
+	else if (argc > 0 && strcmp(cmd, "request_to_reset_device") == 0)
+	{
+		data[0] = 0xFF;
+		data[1] = 0xB1;
+		cmd_size = 2;
+	}
+	else if (argc > 0 && strcmp(cmd, "query_device_mode") == 0)
+	{
+		data[0] = 0xFF;
+		data[1] = 0xB2;
+		cmd_size = 2;
+	}
+	else if (argc > 0 && strcmp(cmd, "enable_CANbus") == 0)
+	{
+		data[0] = 0xFF;
+		data[1] = 0x01;
+		data[2] = 0x01;
+		cmd_size = 3;
+	}
+	else if (argc > 0 && strcmp(cmd, "disable_CANbus") == 0)
+	{
+		data[0] = 0xFF;
+		data[1] = 0x01;
+		data[2] = 0x00;
+		cmd_size = 3;
+	}
+	else if (argc > 0 && strcmp(cmd, "enable_loopback_mode") == 0)
+	{
+		data[0] = 0xFF;
+		data[1] = 0x02;
+		data[2] = 0x01;
+		cmd_size = 3;
+	}
+	else if (argc > 0 && strcmp(cmd, "disable_loopback_mode") == 0)
+	{
+		data[0] = 0xFF;
+		data[1] = 0x02;
+		data[2] = 0x00;
+		cmd_size = 3;
+	}
+	else if (argc > 0 && strcmp(cmd, "CANbus_status") == 0)
+	{
+		data[0] = 0xFF;
+		data[1] = 0x06;
+		cmd_size = 2;
+	}
+	else if (argc > 0 && strcmp(cmd, "CANbus_err_count") == 0)
+	{
+		data[0] = 0xFF;
+		data[1] = 0x07;
+		cmd_size = 2;
+	}
+	else
+	{
+		usage(argc, argv);
+		return 0;
+	}
 
     /* Initialize libusb
      */
@@ -126,17 +233,33 @@ int main(int argc, char **argv)
 
     /* We can now start sending or receiving data to the device
      */
+#if 1
     unsigned char buf[65];
     int len;
-    
-    while(1) {
-        write_char('t');
-        len = read_chars(buf, 64);
-        buf[len] = 0;
-        fprintf(stdout, "Received: \"%s\"\n", buf);
-        sleep(1);
-    }
 
+   	fprintf(stdout, "Sent:");
+	for (int i=0; i < cmd_size; i++)
+    	fprintf(stdout, "0x%02X ", data[i]);
+	fprintf(stdout, "\n");
+
+    while (1) {
+        write_char(data, sizeof(data));
+        len = read_chars(buf, 64);
+		if (cmd_size == 3) break;
+		if ((buf[0] != data[0]) || (buf[1] != data[1]))
+		{
+            fprintf(stdout, "Polling\n");
+			continue;
+		}
+        fprintf(stdout, "Received (%d):",len);
+        for (int i = 0 ;i < len ; i++)
+            fprintf(stdout, "0x%02X ",buf[i]);
+        if (len != 0) {
+            fprintf(stdout, "\n");
+            break;
+        }
+    }
+#endif
     libusb_release_interface(devh, 0);
 
 out:

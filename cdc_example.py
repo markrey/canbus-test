@@ -13,7 +13,7 @@ import array
 
 # Look for a specific device and open it
 #
-dev = usb.core.find(idVendor=0x2341, idProduct=0x0034) # Arduino Leonardo
+dev = usb.core.find(idVendor=0x03eb, idProduct=0x2404) 
 if dev is None:
     raise ValueError('Device not found')
 

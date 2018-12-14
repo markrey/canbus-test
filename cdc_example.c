@@ -129,14 +129,14 @@ int main(int argc, char **argv)
 	else if (argc > 0 && strcmp(cmd, "enable_CANbus") == 0)
 	{
 		data[0] = 0xFF;
-		data[1] = 0x01;
+		data[1] = 0x00;
 		data[2] = 0x01;
 		cmd_size = 3;
 	}
 	else if (argc > 0 && strcmp(cmd, "disable_CANbus") == 0)
 	{
 		data[0] = 0xFF;
-		data[1] = 0x01;
+		data[1] = 0x00;
 		data[2] = 0x00;
 		cmd_size = 3;
 	}
